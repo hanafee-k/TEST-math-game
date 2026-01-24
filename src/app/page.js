@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { saveScoreToFirebase, getTopScores } from './firebase';
 
 export default function MathAdventure() {
   // === STATE MANAGEMENT ===
   const [isClient, setIsClient] = useState(false);
-  const [gameState, setGameState] = useState('START'); // START, PLAYING, QUIZ, PAUSED, GAMEOVER
+  const [gameState, setGameState] = useState('START'); // START, PLAYING, QUIZ, PAUSED, GAMEOVER, LEADERBOARD
   const [playerName, setPlayerName] = useState('');
   
   // Game Stats
@@ -21,6 +22,9 @@ export default function MathAdventure() {
   const [direction, setDirection] = useState('right');
   const [isMoving, setIsMoving] = useState(false);
   
+  // Enemy System
+  const [enemies, setEnemies] = useState([]);
+  
   // Quiz System
   const [question, setQuestion] = useState(null);
   const [timeLeft, setTimeLeft] = useState(10);
@@ -31,6 +35,10 @@ export default function MathAdventure() {
   const [particles, setParticles] = useState([]);
   const [shake, setShake] = useState(false);
   const [flashCorrect, setFlashCorrect] = useState(false);
+  
+  // Leaderboard
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   
   // Refs for intervals
   const moveIntervalRef = useRef(null);
@@ -57,19 +65,42 @@ export default function MathAdventure() {
   }, []);
 
   // === DATA PERSISTENCE ===
-  const loadGameData = () => {
+  const loadGameData = async () => {
     try {
+      // Load local high score
       const savedHighScore = localStorage.getItem('mathHighScore');
       const savedName = localStorage.getItem('mathPlayerName');
+      
       if (savedHighScore) setHighScore(parseInt(savedHighScore));
       if (savedName) setPlayerName(savedName);
+      
+      // Load leaderboard from Firebase
+      await loadLeaderboard();
     } catch (e) {
-      console.warn('LocalStorage not available:', e);
+      console.warn('Error loading game data:', e);
     }
   };
 
-  const saveGameData = (newScore, name) => {
+  const loadLeaderboard = async () => {
     try {
+      setLoadingLeaderboard(true);
+      const scores = await getTopScores(10); // Get top 10
+      setLeaderboard(scores);
+    } catch (error) {
+      console.error('Error loading leaderboard:', error);
+      // Fallback to localStorage if Firebase fails
+      const savedLeaderboard = localStorage.getItem('mathLeaderboard');
+      if (savedLeaderboard) {
+        setLeaderboard(JSON.parse(savedLeaderboard));
+      }
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  };
+
+  const saveGameData = async (newScore, name) => {
+    try {
+      // Update local high score
       if (newScore > highScore) {
         localStorage.setItem('mathHighScore', newScore);
         setHighScore(newScore);
@@ -77,6 +108,30 @@ export default function MathAdventure() {
       if (name) {
         localStorage.setItem('mathPlayerName', name);
       }
+      
+      // Save to Firebase
+      if (newScore > 0) {
+        await saveScoreToFirebase(name || 'Player', newScore, maxCombo);
+        
+        // Reload leaderboard to show updated data
+        await loadLeaderboard();
+      }
+      
+      // Also save to localStorage as backup
+      const newEntry = {
+        name: name || 'Player',
+        score: newScore,
+        timestamp: new Date().toISOString(),
+        combo: maxCombo
+      };
+      
+      const savedLeaderboard = localStorage.getItem('mathLeaderboard');
+      const currentLeaderboard = savedLeaderboard ? JSON.parse(savedLeaderboard) : [];
+      const updatedLeaderboard = [...currentLeaderboard, newEntry]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10);
+      
+      localStorage.setItem('mathLeaderboard', JSON.stringify(updatedLeaderboard));
     } catch (e) {
       console.warn('Could not save data:', e);
     }
@@ -120,6 +175,31 @@ export default function MathAdventure() {
     };
     setFruitPos(newPos);
   }, []);
+
+  // === ENEMY SYSTEM ===
+  const spawnEnemy = useCallback(() => {
+    if (gameState !== 'PLAYING') return;
+    
+    // Spawn enemy at random edge
+    const edge = Math.floor(Math.random() * 4); // 0:top, 1:right, 2:bottom, 3:left
+    let x, y;
+    
+    switch(edge) {
+      case 0: x = Math.random() * 100; y = 0; break;
+      case 1: x = 100; y = Math.random() * 100; break;
+      case 2: x = Math.random() * 100; y = 100; break;
+      case 3: x = 0; y = Math.random() * 100; break;
+    }
+    
+    const newEnemy = {
+      id: Date.now(),
+      x,
+      y,
+      speed: 0.3 + (score * 0.02) // Speed increases with score
+    };
+    
+    setEnemies(prev => [...prev, newEnemy]);
+  }, [gameState, score]);
 
   // === MOVEMENT SYSTEM ===
   const moveCharacter = useCallback((dir) => {
@@ -334,6 +414,7 @@ export default function MathAdventure() {
     setScore(0);
     setHearts(3);
     setCombo(0);
+    setEnemies([]);
     setCharPos({ x: 50, y: 50 });
     randomizeFruit();
     setGameState('PLAYING');
@@ -342,6 +423,7 @@ export default function MathAdventure() {
 
   const endGame = useCallback(() => {
     setGameState('GAMEOVER');
+    setEnemies([]);
     saveGameData(score, playerName);
     
     if (score > highScore) {
@@ -353,10 +435,71 @@ export default function MathAdventure() {
     setScore(0);
     setHearts(3);
     setCombo(0);
+    setEnemies([]);
     setCharPos({ x: 50, y: 50 });
     randomizeFruit();
     setGameState('PLAYING');
   }, [randomizeFruit]);
+
+  // Enemy Movement - Placed after endGame is defined
+  useEffect(() => {
+    if (gameState !== 'PLAYING') return;
+    
+    const moveEnemies = setInterval(() => {
+      setEnemies(prev => {
+        return prev.map(enemy => {
+          // Chase player
+          const dx = charPos.x - enemy.x;
+          const dy = charPos.y - enemy.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance === 0) return enemy;
+          
+          const newX = enemy.x + (dx / distance) * enemy.speed;
+          const newY = enemy.y + (dy / distance) * enemy.speed;
+          
+          // Check collision with player - ONE HIT = ONE HEART LOST
+          const collisionDist = Math.sqrt(
+            Math.pow(newX - charPos.x, 2) + 
+            Math.pow(newY - charPos.y, 2)
+          );
+          
+          if (collisionDist < 8) {
+            // Hit! Lose 1 heart per ghost
+            playSound('wrong');
+            setShake(true);
+            setTimeout(() => setShake(false), 500);
+            
+            setHearts(h => {
+              const newH = h - 1;
+              if (newH <= 0) {
+                setTimeout(() => endGame(), 500);
+              }
+              return newH;
+            });
+            
+            // Remove this enemy after collision
+            return null;
+          }
+          
+          return { ...enemy, x: newX, y: newY };
+        }).filter(Boolean); // Remove nulls
+      });
+    }, 50);
+    
+    return () => clearInterval(moveEnemies);
+  }, [gameState, charPos, playSound, endGame]);
+
+  // Spawn enemies periodically
+  useEffect(() => {
+    if (gameState !== 'PLAYING') return; // Remove score requirement - enemies spawn from start!
+    
+    const spawnInterval = setInterval(() => {
+      spawnEnemy();
+    }, Math.max(5000 - (score * 200), 2000)); // Faster spawning as score increases
+    
+    return () => clearInterval(spawnInterval);
+  }, [gameState, score, spawnEnemy]);
 
   // === RENDER GUARD ===
   if (!isClient) {
@@ -427,6 +570,12 @@ export default function MathAdventure() {
               🔥 Combo x{combo}
             </div>
           )}
+          <button 
+            onClick={() => setGameState('LEADERBOARD')}
+            className="glass-btn px-4 py-2 text-xs font-semibold hover:bg-white/30 transition-all"
+          >
+            📊 Leaderboard
+          </button>
         </div>
 
         {(gameState === 'PLAYING' || gameState === 'QUIZ') && (
@@ -467,6 +616,23 @@ export default function MathAdventure() {
             </div>
           </div>
         )}
+
+        {/* ENEMIES */}
+        {gameState === 'PLAYING' && enemies.map(enemy => (
+          <div
+            key={enemy.id}
+            className="absolute w-16 h-16 md:w-20 md:h-20 z-25 transition-all duration-100"
+            style={{
+              left: `${enemy.x}%`,
+              top: `${enemy.y}%`,
+              transform: 'translate(-50%, -50%)'
+            }}
+          >
+            <div className="relative w-full h-full animate-bounce">
+              <div className="text-5xl md:text-6xl">👻</div>
+            </div>
+          </div>
+        ))}
 
         {/* FRUIT TARGET */}
         {(gameState === 'PLAYING' || gameState === 'QUIZ') && (
@@ -663,6 +829,92 @@ export default function MathAdventure() {
                 >
                   🏠 หน้าแรก
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* === LEADERBOARD SCREEN === */}
+        {gameState === 'LEADERBOARD' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-lg z-50 p-4">
+            <div className="glass-effect p-6 md:p-8 rounded-3xl max-w-2xl w-full border-4 border-purple-300/30 animate-pop max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="text-5xl">📊</div>
+                  <h2 className="text-3xl md:text-4xl font-black text-white">Leaderboard</h2>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={loadLeaderboard}
+                    disabled={loadingLeaderboard}
+                    className="glass-btn px-4 py-2 text-sm font-bold hover:bg-white/30 disabled:opacity-50"
+                  >
+                    {loadingLeaderboard ? '⏳' : '🔄'} Refresh
+                  </button>
+                  <button 
+                    onClick={() => setGameState('START')}
+                    className="glass-btn px-4 py-2 text-sm font-bold hover:bg-white/30"
+                  >
+                    ✕ ปิด
+                  </button>
+                </div>
+              </div>
+              
+              {loadingLeaderboard ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4 animate-bounce">⏳</div>
+                  <p className="text-xl font-bold text-white">กำลังโหลด...</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {leaderboard.length === 0 ? (
+                    <div className="text-center py-12 text-white/60">
+                      <div className="text-6xl mb-4">🎮</div>
+                      <p className="text-xl font-bold">ยังไม่มีคะแนน</p>
+                      <p className="text-sm mt-2">เริ่มเล่นเกมเพื่อบันทึกคะแนน!</p>
+                    </div>
+                  ) : (
+                    leaderboard.map((entry, index) => (
+                      <div 
+                        key={entry.id || index}
+                        className={`glass-effect p-4 rounded-2xl border-2 transition-all hover:scale-102 ${
+                          index === 0 ? 'border-yellow-400/50 bg-yellow-500/10' :
+                          index === 1 ? 'border-gray-300/50 bg-gray-500/10' :
+                          index === 2 ? 'border-orange-400/50 bg-orange-500/10' :
+                          'border-white/20'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="text-3xl font-black">
+                              {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                            </div>
+                            <div className="text-left">
+                              <p className="font-black text-white text-lg">{entry.name}</p>
+                              <div className="flex items-center gap-2 text-xs text-white/60">
+                                <span>{new Date(entry.timestamp || entry.createdAt?.toDate?.() || Date.now()).toLocaleDateString('th-TH')}</span>
+                                {entry.combo > 1 && <span>🔥 x{entry.combo}</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-3xl font-black text-yellow-300">{entry.score}</p>
+                            <p className="text-xs text-white/60">คะแนน</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+              
+              <div className="mt-6 pt-6 border-t border-white/20 text-center">
+                <p className="text-white/60 text-sm">
+                  💡 ครูสามารถดูคะแนนนักเรียนทั้งหมดได้ที่นี่
+                </p>
+                <p className="text-white/40 text-xs mt-2">
+                  🔥 Powered by Firebase - Real-time sync
+                </p>
               </div>
             </div>
           </div>
