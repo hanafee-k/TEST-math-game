@@ -665,14 +665,14 @@ export default function MathAdventure() {
       </div>
 
       {/* === MOBILE D-PAD CONTROLS === */}
-      {(gameState === 'PLAYING' || gameState === 'QUIZ') && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 lg:hidden">
+      {gameState === 'PLAYING' && (
+        <div className="fixed bottom-6 left-6 z-40 lg:hidden">
           <div className="grid grid-cols-3 gap-3">
             {/* Top Row */}
-            <div className="w-24 h-24" />
+            <div className="w-20 h-20" />
             <button 
-              className="w-24 h-24 backdrop-blur-xl bg-white/25 border-3 border-white/40 
-                         rounded-2xl flex items-center justify-center text-5xl 
+              className="w-20 h-20 backdrop-blur-xl bg-white/25 border-2 border-white/40 
+                         rounded-2xl flex items-center justify-center text-4xl 
                          transition-all duration-150 shadow-2xl cursor-pointer
                          hover:bg-white/35 active:bg-white/50 active:scale-90
                          select-none touch-none"
@@ -688,12 +688,12 @@ export default function MathAdventure() {
             >
               ⬆️
             </button>
-            <div className="w-24 h-24" />
+            <div className="w-20 h-20" />
             
             {/* Middle Row */}
             <button 
-              className="w-24 h-24 backdrop-blur-xl bg-white/25 border-3 border-white/40 
-                         rounded-2xl flex items-center justify-center text-5xl 
+              className="w-20 h-20 backdrop-blur-xl bg-white/25 border-2 border-white/40 
+                         rounded-2xl flex items-center justify-center text-4xl 
                          transition-all duration-150 shadow-2xl cursor-pointer
                          hover:bg-white/35 active:bg-white/50 active:scale-90
                          select-none touch-none"
@@ -709,12 +709,12 @@ export default function MathAdventure() {
             >
               ⬅️
             </button>
-            <div className="w-24 h-24 backdrop-blur-lg bg-white/10 rounded-full border-2 border-white/20 flex items-center justify-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-pink-400/50 to-purple-500/50 rounded-full animate-pulse" />
+            <div className="w-20 h-20 backdrop-blur-lg bg-white/10 rounded-full border-2 border-white/20 flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-pink-400/50 to-purple-500/50 rounded-full animate-pulse" />
             </div>
             <button 
-              className="w-24 h-24 backdrop-blur-xl bg-white/25 border-3 border-white/40 
-                         rounded-2xl flex items-center justify-center text-5xl 
+              className="w-20 h-20 backdrop-blur-xl bg-white/25 border-2 border-white/40 
+                         rounded-2xl flex items-center justify-center text-4xl 
                          transition-all duration-150 shadow-2xl cursor-pointer
                          hover:bg-white/35 active:bg-white/50 active:scale-90
                          select-none touch-none"
@@ -732,10 +732,10 @@ export default function MathAdventure() {
             </button>
             
             {/* Bottom Row */}
-            <div className="w-24 h-24" />
+            <div className="w-20 h-20" />
             <button 
-              className="w-24 h-24 backdrop-blur-xl bg-white/25 border-3 border-white/40 
-                         rounded-2xl flex items-center justify-center text-5xl 
+              className="w-20 h-20 backdrop-blur-xl bg-white/25 border-2 border-white/40 
+                         rounded-2xl flex items-center justify-center text-4xl 
                          transition-all duration-150 shadow-2xl cursor-pointer
                          hover:bg-white/35 active:bg-white/50 active:scale-90
                          select-none touch-none"
@@ -751,7 +751,7 @@ export default function MathAdventure() {
             >
               ⬇️
             </button>
-            <div className="w-24 h-24" />
+            <div className="w-20 h-20" />
           </div>
         </div>
       )}
