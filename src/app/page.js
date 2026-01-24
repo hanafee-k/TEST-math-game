@@ -666,43 +666,92 @@ export default function MathAdventure() {
 
       {/* === MOBILE D-PAD CONTROLS === */}
       {(gameState === 'PLAYING' || gameState === 'QUIZ') && (
-        <div className="absolute bottom-6 left-6 z-40 md:hidden">
-          <div className="grid grid-cols-3 gap-2">
-            <div />
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 lg:hidden">
+          <div className="grid grid-cols-3 gap-3">
+            {/* Top Row */}
+            <div className="w-24 h-24" />
             <button 
-              className="dpad-btn"
-              onTouchStart={(e) => { e.preventDefault(); moveCharacter('up'); }}
-              onClick={() => moveCharacter('up')}
+              className="w-24 h-24 backdrop-blur-xl bg-white/25 border-3 border-white/40 
+                         rounded-2xl flex items-center justify-center text-5xl 
+                         transition-all duration-150 shadow-2xl cursor-pointer
+                         hover:bg-white/35 active:bg-white/50 active:scale-90
+                         select-none touch-none"
+              onTouchStart={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation();
+                moveCharacter('up'); 
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                moveCharacter('up');
+              }}
             >
               ⬆️
             </button>
-            <div />
+            <div className="w-24 h-24" />
             
+            {/* Middle Row */}
             <button 
-              className="dpad-btn"
-              onTouchStart={(e) => { e.preventDefault(); moveCharacter('left'); }}
-              onClick={() => moveCharacter('left')}
+              className="w-24 h-24 backdrop-blur-xl bg-white/25 border-3 border-white/40 
+                         rounded-2xl flex items-center justify-center text-5xl 
+                         transition-all duration-150 shadow-2xl cursor-pointer
+                         hover:bg-white/35 active:bg-white/50 active:scale-90
+                         select-none touch-none"
+              onTouchStart={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation();
+                moveCharacter('left'); 
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                moveCharacter('left');
+              }}
             >
               ⬅️
             </button>
-            <div className="w-20 h-20 glass-effect rounded-full opacity-50" />
+            <div className="w-24 h-24 backdrop-blur-lg bg-white/10 rounded-full border-2 border-white/20 flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-pink-400/50 to-purple-500/50 rounded-full animate-pulse" />
+            </div>
             <button 
-              className="dpad-btn"
-              onTouchStart={(e) => { e.preventDefault(); moveCharacter('right'); }}
-              onClick={() => moveCharacter('right')}
+              className="w-24 h-24 backdrop-blur-xl bg-white/25 border-3 border-white/40 
+                         rounded-2xl flex items-center justify-center text-5xl 
+                         transition-all duration-150 shadow-2xl cursor-pointer
+                         hover:bg-white/35 active:bg-white/50 active:scale-90
+                         select-none touch-none"
+              onTouchStart={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation();
+                moveCharacter('right'); 
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                moveCharacter('right');
+              }}
             >
               ➡️
             </button>
             
-            <div />
+            {/* Bottom Row */}
+            <div className="w-24 h-24" />
             <button 
-              className="dpad-btn"
-              onTouchStart={(e) => { e.preventDefault(); moveCharacter('down'); }}
-              onClick={() => moveCharacter('down')}
+              className="w-24 h-24 backdrop-blur-xl bg-white/25 border-3 border-white/40 
+                         rounded-2xl flex items-center justify-center text-5xl 
+                         transition-all duration-150 shadow-2xl cursor-pointer
+                         hover:bg-white/35 active:bg-white/50 active:scale-90
+                         select-none touch-none"
+              onTouchStart={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation();
+                moveCharacter('down'); 
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                moveCharacter('down');
+              }}
             >
               ⬇️
             </button>
-            <div />
+            <div className="w-24 h-24" />
           </div>
         </div>
       )}
