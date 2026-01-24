@@ -7,7 +7,7 @@ export const metadata = {
     width: 'device-width',
     initialScale: 1,
     maximumScale: 1,
-    userScalable: false,
+    userScalable: 0,
   },
   themeColor: '#667eea',
 }
@@ -20,7 +20,7 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="overflow-hidden antialiased">
+      <body className="overflow-hidden overscroll-none touch-none">
         {children}
       </body>
     </html>
