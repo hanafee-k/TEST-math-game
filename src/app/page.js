@@ -620,9 +620,15 @@ export default function MathAdventure() {
                 {score > highScore ? '🏆' : '💀'}
               </div>
               
-              <h2 className="text-4xl md:text-5xl font-black text-white mb-4">
+              <h2 className="text-4xl md:text-5xl font-black text-white mb-2">
                 {score > highScore ? 'สถิติใหม่!' : 'Game Over!'}
               </h2>
+              
+              {playerName && (
+                <p className="text-xl text-white/80 font-bold mb-4">
+                  👤 {playerName}
+                </p>
+              )}
               
               <div className="glass-effect p-6 rounded-2xl mb-6 border-2 border-white/20">
                 <div className="grid grid-cols-2 gap-4 text-center">
@@ -666,14 +672,14 @@ export default function MathAdventure() {
 
       {/* === MOBILE D-PAD CONTROLS === */}
       {gameState === 'PLAYING' && (
-        <div className="fixed bottom-6 left-6 z-40 lg:hidden">
-          <div className="grid grid-cols-3 gap-3">
+        <div className="fixed bottom-4 left-4 z-40 lg:hidden">
+          <div className="grid grid-cols-3 gap-2">
             {/* Top Row */}
-            <div className="w-20 h-20" />
+            <div className="w-16 h-16" />
             <button 
-              className="w-20 h-20 backdrop-blur-xl bg-white/25 border-2 border-white/40 
-                         rounded-2xl flex items-center justify-center text-4xl 
-                         transition-all duration-150 shadow-2xl cursor-pointer
+              className="w-16 h-16 backdrop-blur-xl bg-white/25 border-2 border-white/40 
+                         rounded-xl flex items-center justify-center text-3xl 
+                         transition-all duration-150 shadow-xl cursor-pointer
                          hover:bg-white/35 active:bg-white/50 active:scale-90
                          select-none touch-none"
               onTouchStart={(e) => { 
@@ -688,13 +694,13 @@ export default function MathAdventure() {
             >
               ⬆️
             </button>
-            <div className="w-20 h-20" />
+            <div className="w-16 h-16" />
             
             {/* Middle Row */}
             <button 
-              className="w-20 h-20 backdrop-blur-xl bg-white/25 border-2 border-white/40 
-                         rounded-2xl flex items-center justify-center text-4xl 
-                         transition-all duration-150 shadow-2xl cursor-pointer
+              className="w-16 h-16 backdrop-blur-xl bg-white/25 border-2 border-white/40 
+                         rounded-xl flex items-center justify-center text-3xl 
+                         transition-all duration-150 shadow-xl cursor-pointer
                          hover:bg-white/35 active:bg-white/50 active:scale-90
                          select-none touch-none"
               onTouchStart={(e) => { 
@@ -709,13 +715,13 @@ export default function MathAdventure() {
             >
               ⬅️
             </button>
-            <div className="w-20 h-20 backdrop-blur-lg bg-white/10 rounded-full border-2 border-white/20 flex items-center justify-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-pink-400/50 to-purple-500/50 rounded-full animate-pulse" />
+            <div className="w-16 h-16 backdrop-blur-lg bg-white/10 rounded-full border border-white/20 flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-pink-400/50 to-purple-500/50 rounded-full animate-pulse" />
             </div>
             <button 
-              className="w-20 h-20 backdrop-blur-xl bg-white/25 border-2 border-white/40 
-                         rounded-2xl flex items-center justify-center text-4xl 
-                         transition-all duration-150 shadow-2xl cursor-pointer
+              className="w-16 h-16 backdrop-blur-xl bg-white/25 border-2 border-white/40 
+                         rounded-xl flex items-center justify-center text-3xl 
+                         transition-all duration-150 shadow-xl cursor-pointer
                          hover:bg-white/35 active:bg-white/50 active:scale-90
                          select-none touch-none"
               onTouchStart={(e) => { 
@@ -732,11 +738,11 @@ export default function MathAdventure() {
             </button>
             
             {/* Bottom Row */}
-            <div className="w-20 h-20" />
+            <div className="w-16 h-16" />
             <button 
-              className="w-20 h-20 backdrop-blur-xl bg-white/25 border-2 border-white/40 
-                         rounded-2xl flex items-center justify-center text-4xl 
-                         transition-all duration-150 shadow-2xl cursor-pointer
+              className="w-16 h-16 backdrop-blur-xl bg-white/25 border-2 border-white/40 
+                         rounded-xl flex items-center justify-center text-3xl 
+                         transition-all duration-150 shadow-xl cursor-pointer
                          hover:bg-white/35 active:bg-white/50 active:scale-90
                          select-none touch-none"
               onTouchStart={(e) => { 
@@ -751,7 +757,7 @@ export default function MathAdventure() {
             >
               ⬇️
             </button>
-            <div className="w-20 h-20" />
+            <div className="w-16 h-16" />
           </div>
         </div>
       )}
