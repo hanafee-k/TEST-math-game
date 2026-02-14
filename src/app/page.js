@@ -3,10 +3,47 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { saveScoreToFirebase, getTopScores } from './firebase';
 
+// === คลังโจทย์จำนวนตรรกยะ (ม.1) - แบบง่าย & คิดไว ===
+const RATIONAL_QUESTIONS = [
+  // หมวด: บวก/ลบ จำนวนเต็ม (ง่าย)
+  { text: "(-2) + 5 = ?", correct: "3", choices: ["3", "-3", "7", "-7"] },
+  { text: "10 + (-4) = ?", correct: "6", choices: ["6", "-6", "14", "-14"] },
+  { text: "(-3) - 2 = ?", correct: "-5", choices: ["-5", "-1", "1", "5"] },
+  { text: "8 - (-2) = ?", correct: "10", choices: ["10", "6", "-6", "-10"] },
+  { text: "(-5) + (-5) = ?", correct: "-10", choices: ["-10", "0", "10", "-25"] },
+  { text: "0 - 7 = ?", correct: "-7", choices: ["-7", "7", "0", "1"] },
+  { text: "(-2) + 2 = ?", correct: "0", choices: ["0", "-4", "4", "2"] },
+  { text: "(-4) + (-1) = ?", correct: "-5", choices: ["-5", "-3", "3", "5"] },
+  { text: "-1 + 0 = ?", correct: "-1", choices: ["-1", "1", "0", "10"] },
+
+  // หมวด: คูณ/หาร จำนวนเต็ม (ง่าย)
+  { text: "(-3) × 2 = ?", correct: "-6", choices: ["-6", "6", "-1", "-5"] },
+  { text: "4 × (-4) = ?", correct: "-16", choices: ["-16", "16", "0", "-8"] },
+  { text: "(-5) × (-2) = ?", correct: "10", choices: ["10", "-10", "-7", "7"] },
+  { text: "12 ÷ (-3) = ?", correct: "-4", choices: ["-4", "4", "9", "-15"] },
+  { text: "(-10) ÷ (-2) = ?", correct: "5", choices: ["5", "-5", "8", "-12"] },
+  { text: "(-1) × (-1) = ?", correct: "1", choices: ["1", "-1", "0", "2"] },
+
+  // หมวด: ทศนิยม (คิดในใจได้)
+  { text: "1.5 + 1.5 = ?", correct: "3", choices: ["3", "2", "2.5", "3.5"] },
+  { text: "2.5 - 0.5 = ?", correct: "2", choices: ["2", "3", "1", "2.5"] },
+  { text: "(-1.0) + 2.0 = ?", correct: "1", choices: ["1", "-1", "3", "-3"] },
+  { text: "0.2 + 0.3 = ?", correct: "0.5", choices: ["0.5", "0.6", "1.5", "0.1"] },
+  { text: "1.0 - 0.4 = ?", correct: "0.6", choices: ["0.6", "1.4", "0.5", "-0.6"] },
+  { text: "0.5 × 2 = ?", correct: "1", choices: ["1", "0.1", "10", "2.5"] },
+  { text: "10.5 - 0.5 = ?", correct: "10", choices: ["10", "11", "10.05", "9.5"] },
+
+  // หมวด: เศษส่วนพื้นฐาน (ตัวส่วนเท่ากัน / แปลงค่า)
+  { text: "1/5 + 2/5 = ?", correct: "3/5", choices: ["3/5", "2/5", "4/5", "3/10"] },
+  { text: "3/7 - 1/7 = ?", correct: "2/7", choices: ["2/7", "4/7", "0", "1/7"] },
+  { text: "1/2 เขียนเป็นทศนิยม?", correct: "0.5", choices: ["0.5", "0.2", "1.2", "0.25"] },
+  { text: "0.5 เขียนเป็นเศษส่วน?", correct: "1/2", choices: ["1/2", "1/4", "1/5", "1/3"] }
+];
+
 export default function MathAdventure() {
   // === STATE MANAGEMENT ===
   const [isClient, setIsClient] = useState(false);
-  const [gameState, setGameState] = useState('START'); // START, PLAYING, QUIZ, PAUSED, GAMEOVER, LEADERBOARD
+  const [gameState, setGameState] = useState('START'); 
   const [playerName, setPlayerName] = useState('');
 
   // Game Stats
@@ -18,12 +55,13 @@ export default function MathAdventure() {
 
   // Game Physics
   const [charPos, setCharPos] = useState({ x: 50, y: 50 });
-  const [fruitPos, setFruitPos] = useState({ x: 70, y: 30 });
+  const [wormPos, setWormPos] = useState({ x: 70, y: 30 }); // 🐛 เปลี่ยนจาก fruit เป็น worm
   const [direction, setDirection] = useState('right');
   const [isMoving, setIsMoving] = useState(false);
 
-  // Enemy System
-  const [enemies, setEnemies] = useState([]);
+  // Entities
+  const [enemies, setEnemies] = useState([]); // 🦅 ศัตรู (เหยี่ยว/นักล่า)
+  const [obstacles, setObstacles] = useState([]); // 🧱 สิ่งกีดขวาง
 
   // Quiz System
   const [question, setQuestion] = useState(null);
@@ -48,7 +86,7 @@ export default function MathAdventure() {
   useEffect(() => {
     setIsClient(true);
     loadGameData();
-    randomizeFruit();
+    randomizeWorm();
 
     const preventNav = (e) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
@@ -68,14 +106,10 @@ export default function MathAdventure() {
     try {
       const savedHighScore = localStorage.getItem('mathHighScore');
       const savedName = localStorage.getItem('mathPlayerName');
-
       if (savedHighScore) setHighScore(parseInt(savedHighScore));
       if (savedName) setPlayerName(savedName);
-
       await loadLeaderboard();
-    } catch (e) {
-      console.warn('Error loading game data:', e);
-    }
+    } catch (e) { console.warn('Error loading game data:', e); }
   };
 
   const loadLeaderboard = async () => {
@@ -86,9 +120,7 @@ export default function MathAdventure() {
     } catch (error) {
       console.error('Error loading leaderboard:', error);
       const savedLeaderboard = localStorage.getItem('mathLeaderboard');
-      if (savedLeaderboard) {
-        setLeaderboard(JSON.parse(savedLeaderboard));
-      }
+      if (savedLeaderboard) setLeaderboard(JSON.parse(savedLeaderboard));
     } finally {
       setLoadingLeaderboard(false);
     }
@@ -100,32 +132,13 @@ export default function MathAdventure() {
         localStorage.setItem('mathHighScore', newScore);
         setHighScore(newScore);
       }
-      if (name) {
-        localStorage.setItem('mathPlayerName', name);
-      }
+      if (name) localStorage.setItem('mathPlayerName', name);
 
       if (newScore > 0) {
         await saveScoreToFirebase(name || 'Player', newScore, maxCombo);
         await loadLeaderboard();
       }
-
-      const newEntry = {
-        name: name || 'Player',
-        score: newScore,
-        timestamp: new Date().toISOString(),
-        combo: maxCombo
-      };
-
-      const savedLeaderboard = localStorage.getItem('mathLeaderboard');
-      const currentLeaderboard = savedLeaderboard ? JSON.parse(savedLeaderboard) : [];
-      const updatedLeaderboard = [...currentLeaderboard, newEntry]
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10);
-
-      localStorage.setItem('mathLeaderboard', JSON.stringify(updatedLeaderboard));
-    } catch (e) {
-      console.warn('Could not save data:', e);
-    }
+    } catch (e) { console.warn('Could not save data:', e); }
   };
 
   // === SOUND SYSTEM ===
@@ -145,10 +158,7 @@ export default function MathAdventure() {
       x: x + (Math.random() - 0.5) * 10,
       y: y + (Math.random() - 0.5) * 10,
       emoji: type === 'star' ? '⭐' : type === 'heart' ? '❤️' : '💥',
-      velocity: {
-        x: (Math.random() - 0.5) * 4,
-        y: -Math.random() * 5 - 2
-      }
+      velocity: { x: (Math.random() - 0.5) * 4, y: -Math.random() * 5 - 2 }
     }));
     setParticles(prev => [...prev, ...newParticles]);
     setTimeout(() => {
@@ -156,19 +166,18 @@ export default function MathAdventure() {
     }, 2000);
   };
 
-  // === FRUIT SYSTEM ===
-  const randomizeFruit = useCallback(() => {
+  // === WORM SYSTEM 🐛 ===
+  const randomizeWorm = useCallback(() => {
     const newPos = {
       x: Math.floor(Math.random() * 70) + 15,
       y: Math.floor(Math.random() * 60) + 20
     };
-    setFruitPos(newPos);
+    setWormPos(newPos);
   }, []);
 
-  // === ENEMY SYSTEM (GHOST - FAST VERSION) ===
+  // === ENEMY SYSTEM 🦅 ===
   const spawnEnemy = useCallback((force = false) => {
     if (!force && gameState !== 'PLAYING') return;
-
     const edge = Math.floor(Math.random() * 4);
     let x, y;
     switch (edge) {
@@ -177,22 +186,86 @@ export default function MathAdventure() {
       case 2: x = Math.random() * 100; y = 110; break;
       case 3: x = -10; y = Math.random() * 100; break;
     }
-
-    // 🔥 ปรับความเร็วตรงนี้ (Faster Logic)
-    // เริ่มต้น 1.2 (จากเดิม 0.3) | เพิ่มขึ้นทีละ 0.1 (จากเดิม 0.02) | ตันที่ 4.0
-    const calculatedSpeed = Math.min(0.9 + (score * 0.04), 3.0);
-
-    const newEnemy = {
-      id: Date.now() + Math.random(),
-      x,
-      y,
-      speed: calculatedSpeed
-    };
-
-    setEnemies(prev => [...prev, newEnemy]);
+    const calculatedSpeed = Math.min(0.5 + (score * 0.03), 2.0);
+    setEnemies(prev => [...prev, { id: Date.now() + Math.random(), 
+      x, 
+      y, 
+      speed: calculatedSpeed,
+      direction: x < 50 ? 'right' : 'left'}]);
   }, [gameState, score]);
 
-  // === MOVEMENT SYSTEM ===
+// === OBSTACLE SYSTEM (STATIC BLOCKS 🧱) ===
+  const randomizeObstacles = useCallback((safeX = 50, safeY = 50) => {
+    // 1. สุ่มจำนวนให้ออกแค่ 3 หรือ 4 อัน (เยอะสุด 4)
+    const count = Math.floor(Math.random() * 2) + 3; 
+    const newObstacles = [];
+
+    for (let i = 0; i < count; i++) {
+      let ox, oy;
+      let isSafe = false;
+      let attempts = 0; // ตัวกันค้าง
+
+      while (!isSafe && attempts < 50) {
+        ox = Math.floor(Math.random() * 80) + 10;
+        oy = Math.floor(Math.random() * 80) + 10;
+        isSafe = true;
+        
+        // กฎข้อที่ 1: ห้ามเกิดทับผู้เล่น (เว้นระยะห่าง 20)
+        const distToPlayer = Math.sqrt(Math.pow(ox - safeX, 2) + Math.pow(oy - safeY, 2));
+        if (distToPlayer < 20) {
+          isSafe = false;
+        }
+
+        // กฎข้อที่ 2: ห้ามเกิดติดกันเอง! (เช็คระยะห่างกับต้นไม้อื่นๆ ต้องห่างกันอย่างน้อย 25)
+        for (const existing of newObstacles) {
+          const distToOther = Math.sqrt(Math.pow(ox - existing.x, 2) + Math.pow(oy - existing.y, 2));
+          if (distToOther < 25) {
+            isSafe = false;
+            break;
+          }
+        }
+        attempts++;
+      }
+
+      if (isSafe) {
+        newObstacles.push({ id: Date.now() + Math.random(), x: ox, y: oy });
+      }
+    }
+    setObstacles(newObstacles);
+  }, []);
+
+  // === END GAME TRIGGER ===
+  const endGame = useCallback(() => {
+    setGameState('GAMEOVER');
+    setEnemies([]);
+    setObstacles([]);
+    saveGameData(score, playerName);
+    if (score > highScore) createParticles(50, 30, 'star');
+  }, [score, highScore, playerName]);
+
+  // === QUIZ SYSTEM ===
+  const generateQuestion = useCallback(() => {
+    setGameState('QUIZ');
+    setSelectedAnswer(null);
+    setShowResult(false);
+
+    const level = Math.floor(score / 3);
+    const timeLimit = Math.max(8, 20 - level); 
+    setTimeLeft(timeLimit);
+
+    const randomIndex = Math.floor(Math.random() * RATIONAL_QUESTIONS.length);
+    const selectedItem = RATIONAL_QUESTIONS[randomIndex];
+    
+    const shuffledChoices = [...selectedItem.choices].sort(() => Math.random() - 0.5);
+
+    setQuestion({
+      text: selectedItem.text,
+      choices: shuffledChoices,
+      correct: selectedItem.correct
+    });
+  }, [score]);
+
+  // === MOVEMENT & COLLISION SYSTEM ===
   const moveCharacter = useCallback((dir) => {
     if (gameState !== 'PLAYING') return;
 
@@ -200,7 +273,7 @@ export default function MathAdventure() {
     setDirection(dir === 'left' || dir === 'right' ? dir : direction);
 
     setCharPos((prev) => {
-      const speed = 3;
+      const speed = 4;
       let newX = prev.x;
       let newY = prev.y;
 
@@ -211,22 +284,34 @@ export default function MathAdventure() {
         case 'right': newX = Math.min(92, prev.x + speed); break;
       }
 
-      const dx = newX - fruitPos.x;
-      const dy = newY - fruitPos.y;
+      // 1. 🛑 เช็คชนสิ่งกีดขวาง (บล็อคทาง ไม่ให้เดินผ่าน)
+      let hitObstacle = false;
+      for (const obs of obstacles) {
+        const dist = Math.sqrt(Math.pow(newX - obs.x, 2) + Math.pow(newY - obs.y, 2));
+        if (dist < 6) { // ปรับรัศมีให้เล็กลงแล้ว เดินไถกำแพงได้ง่ายขึ้น!
+          hitObstacle = true;
+          break;
+        }
+      }
+
+      if (hitObstacle) return prev; 
+
+      // 2. 🐛 เช็คเก็บหนอน (เพื่อไปตอบคำถาม)
+      const dx = newX - wormPos.x;
+      const dy = newY - wormPos.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance < 10) {
+      if (distance < 5) {
         playSound('collect');
-        createParticles(fruitPos.x, fruitPos.y, 'star');
+        createParticles(wormPos.x, wormPos.y, 'star');
         generateQuestion();
         return prev;
       }
-
       return { x: newX, y: newY };
     });
 
     setTimeout(() => setIsMoving(false), 100);
-  }, [gameState, fruitPos, direction, playSound]);
+  }, [gameState, wormPos, direction, obstacles, playSound, generateQuestion]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -236,78 +321,16 @@ export default function MathAdventure() {
         'ArrowLeft': 'left', 'a': 'left', 'A': 'left',
         'ArrowRight': 'right', 'd': 'right', 'D': 'right',
       };
-
       const direction = keyMap[e.key];
       if (direction) {
         e.preventDefault();
         moveCharacter(direction);
       }
-
-      if (e.key === 'Escape' && gameState === 'PLAYING') {
-        setGameState('PAUSED');
-      }
+      if (e.key === 'Escape' && gameState === 'PLAYING') setGameState('PAUSED');
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [moveCharacter, gameState]);
-
-  // === QUIZ SYSTEM ===
-  const generateQuestion = useCallback(() => {
-    setGameState('QUIZ');
-    setSelectedAnswer(null);
-    setShowResult(false);
-
-    const level = Math.floor(score / 3);
-    const timeLimit = Math.max(6, 15 - level);
-    setTimeLeft(timeLimit);
-
-    const range = Math.min(20 + (level * 8), 100);
-    const useNegative = score > 5 ? Math.random() > 0.3 : false;
-
-    const n1 = Math.floor(Math.random() * range) * (useNegative && Math.random() > 0.5 ? -1 : 1);
-    const n2 = Math.floor(Math.random() * range) * (useNegative && Math.random() > 0.5 ? -1 : 1);
-
-    let operation, answer;
-    const opRandom = Math.random();
-
-    if (level < 3 || opRandom < 0.5) {
-      operation = '+';
-      answer = n1 + n2;
-    } else if (opRandom < 0.8) {
-      operation = '-';
-      answer = n1 - n2;
-    } else {
-      const smallN1 = Math.floor(Math.random() * 12) + 1;
-      const smallN2 = Math.floor(Math.random() * 12) + 1;
-      operation = '×';
-      answer = smallN1 * smallN2;
-      setQuestion({
-        text: `${smallN1} ${operation} ${smallN2} = ?`,
-        choices: generateChoices(answer),
-        correct: answer,
-        n1: smallN1, n2: smallN2, operation
-      });
-      return;
-    }
-
-    setQuestion({
-      text: `${n1} ${operation} ${n2} = ?`,
-      choices: generateChoices(answer),
-      correct: answer,
-      n1, n2, operation
-    });
-  }, [score]);
-
-  const generateChoices = (correct) => {
-    const choices = new Set([correct]);
-    while (choices.size < 4) {
-      const offset = Math.floor(Math.random() * 20) - 10;
-      const wrong = correct + offset;
-      if (wrong !== correct) choices.add(wrong);
-    }
-    return Array.from(choices).sort(() => Math.random() - 0.5);
-  };
 
   useEffect(() => {
     if (gameState === 'QUIZ' && timeLeft > 0 && !showResult) {
@@ -339,11 +362,11 @@ export default function MathAdventure() {
       setMaxCombo(Math.max(maxCombo, newCombo));
 
       createParticles(50, 50, 'star');
-
       setEnemies([]);
 
       setTimeout(() => {
-        randomizeFruit();
+        randomizeWorm();
+        randomizeObstacles(charPos.x, charPos.y); 
         setGameState('PLAYING');
         spawnEnemy(true);
       }, 1000);
@@ -361,12 +384,13 @@ export default function MathAdventure() {
         setTimeout(() => endGame(), 1500);
       } else {
         setTimeout(() => {
-          randomizeFruit();
+          randomizeWorm();
+          randomizeObstacles(charPos.x, charPos.y); 
           setGameState('PLAYING');
         }, 1500);
       }
     }
-  }, [score, hearts, combo, maxCombo, question, showResult, playSound, randomizeFruit, spawnEnemy]);
+  }, [score, hearts, combo, maxCombo, question, showResult, playSound, randomizeWorm, spawnEnemy, charPos, randomizeObstacles, endGame]);
 
   // === GAME FLOW ===
   const startGame = useCallback(() => {
@@ -377,17 +401,11 @@ export default function MathAdventure() {
     setCombo(0);
     setEnemies([]);
     setCharPos({ x: 50, y: 50 });
-    randomizeFruit();
+    randomizeWorm();
+    randomizeObstacles(50, 50); 
     setGameState('PLAYING');
     playSound('collect');
-  }, [playerName, randomizeFruit, playSound]);
-
-  const endGame = useCallback(() => {
-    setGameState('GAMEOVER');
-    setEnemies([]);
-    saveGameData(score, playerName);
-    if (score > highScore) createParticles(50, 30, 'star');
-  }, [score, highScore, playerName]);
+  }, [playerName, randomizeWorm, playSound, randomizeObstacles]);
 
   const resetGame = useCallback(() => {
     setScore(0);
@@ -395,59 +413,60 @@ export default function MathAdventure() {
     setCombo(0);
     setEnemies([]);
     setCharPos({ x: 50, y: 50 });
-    randomizeFruit();
+    randomizeWorm();
+    randomizeObstacles(50, 50); 
     setGameState('PLAYING');
-  }, [randomizeFruit]);
+  }, [randomizeWorm, randomizeObstacles]);
 
-  // Enemy Movement
+  // === GAME LOOP: ENEMY MOVEMENT ===
   useEffect(() => {
     if (gameState !== 'PLAYING') return;
 
-    const moveEnemies = setInterval(() => {
-      setEnemies(prev => {
-        return prev.map(enemy => {
-          const dx = charPos.x - enemy.x;
-          const dy = charPos.y - enemy.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+    const gameLoop = setInterval(() => {
+      // ขยับศัตรู 
+      setEnemies(prev => prev.map(enemy => {
+        const dx = charPos.x - enemy.x;
+        const dy = charPos.y - enemy.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-          if (distance === 0) return enemy;
+        if (distance === 0) return enemy;
+        const newX = enemy.x + (dx / distance) * enemy.speed;
+        const newY = enemy.y + (dy / distance) * enemy.speed;
+        const currentDirection = dx > 0 ? 'right' : 'left';
 
-          const newX = enemy.x + (dx / distance) * enemy.speed;
-          const newY = enemy.y + (dy / distance) * enemy.speed;
-
-          const collisionDist = Math.sqrt(
-            Math.pow(newX - charPos.x, 2) + Math.pow(newY - charPos.y, 2)
-          );
-
-          if (collisionDist < 8) {
-            playSound('wrong');
-            setShake(true);
-            setTimeout(() => setShake(false), 500);
-
-            setHearts(h => {
-              const newH = h - 1;
-              if (newH <= 0) setTimeout(() => endGame(), 500);
-              return newH;
-            });
-            return null;
+        // 👇 แก้ตรงนี้: ลดระยะชนลงเหลือ 6 (ภาพจะได้ดูทับกันจริงๆ ถึงจะโดนกัด)
+        if (Math.sqrt(Math.pow(newX - charPos.x, 2) + Math.pow(newY - charPos.y, 2)) < 6) {
+          playSound('wrong');
+          setShake(true);
+          setTimeout(() => setShake(false), 500);
+          setHearts(h => { const newH = h - 1; if (newH <= 0) setTimeout(() => endGame(), 500); return newH; });
+          
+          // 👇 เพิ่มระบบวาร์ป: เมื่อนกโดนกัด เหยี่ยวตัวนั้นจะถูกจับโยนไปเกิดใหม่ขอบจอไกลๆ ทันที
+          const edge = Math.floor(Math.random() * 4);
+          let respawnX, respawnY;
+          switch (edge) {
+            case 0: respawnX = Math.random() * 100; respawnY = -20; break; // โยนไปบนสุด
+            case 1: respawnX = 120; respawnY = Math.random() * 100; break; // โยนไปขวาสุด
+            case 2: respawnX = Math.random() * 100; respawnY = 120; break; // โยนไปล่างสุด
+            case 3: respawnX = -20; respawnY = Math.random() * 100; break; // โยนไปซ้ายสุด
           }
-          return { ...enemy, x: newX, y: newY };
-        }).filter(Boolean);
-      });
+          // คืนค่าเหยี่ยวตัวเดิม แต่จับเปลี่ยนพิกัด X, Y
+          return { ...enemy, x: respawnX, y: respawnY, direction: currentDirection };
+        }
+        
+        return { ...enemy, x: newX, y: newY, direction: currentDirection };
+      }).filter(Boolean));
+
     }, 50);
 
-    return () => clearInterval(moveEnemies);
+    return () => clearInterval(gameLoop);
   }, [gameState, charPos, playSound, endGame]);
 
-  // Spawn enemies loop
+  // Spawn loops
   useEffect(() => {
     if (gameState !== 'PLAYING') return;
-
-    const spawnInterval = setInterval(() => {
-      spawnEnemy();
-    }, Math.max(5000 - (score * 200), 2000));
-
-    return () => clearInterval(spawnInterval);
+    const spawnEnemyInt = setInterval(() => spawnEnemy(), Math.max(5000 - (score * 200), 2000));
+    return () => { clearInterval(spawnEnemyInt); };
   }, [gameState, score, spawnEnemy]);
 
   if (!isClient) return null;
@@ -455,49 +474,67 @@ export default function MathAdventure() {
   return (
     <div className={`h-screen w-full relative overflow-hidden select-none ${shake ? 'animate-shake' : ''}`}>
 
-      {/* 1. BACKGROUND */}
+    {/* 1. BACKGROUND */}
       <div className="absolute inset-0 z-0">
-        <img
-          src="/bg.png" alt="Background"
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.target.style.display = 'none';
-            e.target.parentElement.className = 'absolute inset-0 bg-gradient-animated';
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-900/40 via-purple-900/30 to-pink-900/40"></div>
+        <img src="/bg.png" alt="Background" className="w-full h-full object-cover"
+          onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.className = 'absolute inset-0 bg-slate-800'; }} />
       </div>
 
       {/* 2. GAME AREA */}
       <div className="absolute inset-0 z-10">
+        {/* ตัวละครนก 🦅 */}
         {(gameState === 'PLAYING' || gameState === 'QUIZ') && (
           <div className="absolute w-20 h-20 md:w-24 md:h-24 transition-all duration-100 ease-out z-30 drop-shadow-2xl"
             style={{
               left: `${charPos.x}%`, top: `${charPos.y}%`,
               transform: `translate(-50%, -50%) ${direction === 'left' ? 'scaleX(-1)' : 'scaleX(1)'} ${isMoving ? 'scale(1.1)' : 'scale(1)'}`
             }}>
-            <div className="relative w-full h-full">
-              <img src="/hero.png" alt="Hero" className="w-full h-full object-contain drop-shadow-lg"
-                onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl">🦸</div>'; }} />
+            <div className="relative w-full h-full animate-[bounce_3s_ease-in-out_infinite]">
+              <img src="/bird.png" alt="Hero" className="w-full h-full object-contain drop-shadow-lg"
+                onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl">🦅</div>'; }} />
             </div>
           </div>
         )}
 
+        {/* ศัตรู 🦅 (นักล่าวิ่งไล่) */}
         {gameState === 'PLAYING' && enemies.map(enemy => (
-          <div key={enemy.id} className="absolute w-16 h-16 md:w-20 md:h-20 z-25 transition-all duration-100"
-            style={{ left: `${enemy.x}%`, top: `${enemy.y}%`, transform: 'translate(-50%, -50%)' }}>
+          // 👇 เปลี่ยนขนาดตรงนี้เป็น w-28 h-28 และจอใหญ่เป็น w-36 h-36 👇
+          <div key={enemy.id} className="absolute w-28 h-28 md:w-36 md:h-36 z-25 transition-all duration-100"
+            style={{ left: `${enemy.x}%`, top: `${enemy.y}%`, transform: `translate(-50%, -50%) scaleX(${enemy.direction === 'left' ? '1' : '-1'})` }}>
             <div className="relative w-full h-full animate-bounce">
-              <div className="text-5xl md:text-6xl">👻</div>
+              <img src="/enemy.png" alt="Enemy" className="w-full h-full object-contain drop-shadow-lg"
+                onError={(e) => { 
+                  e.target.style.display = 'none'; 
+                  e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl drop-shadow-2xl flex items-center justify-center">🦅</div>'; 
+                }} />
             </div>
           </div>
         ))}
 
+        {/* สิ่งกีดขวาง (บล็อคทาง) 🧱 */}
+        {gameState === 'PLAYING' && obstacles.map(obs => (
+          <div key={obs.id} className="absolute w-16 h-16 md:w-20 md:h-20 z-20"
+            style={{ left: `${obs.x}%`, top: `${obs.y}%`, transform: `translate(-50%, -50%)` }}>
+            <div className="relative w-full h-full">
+              <img src="/block.png" alt="Block" className="w-full h-full object-contain drop-shadow-xl"
+                onError={(e) => { 
+                  e.target.style.display = 'none'; 
+                  e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl drop-shadow-2xl flex items-center justify-center">🧱</div>'; 
+                }} />
+            </div>
+          </div>
+        ))}
+
+        {/* หนอน 🐛 (โจทย์ถัดไป) */}
         {(gameState === 'PLAYING' || gameState === 'QUIZ') && (
           <div className="absolute w-16 h-16 md:w-20 md:h-20 z-20 animate-bounce-rotate"
-            style={{ left: `${fruitPos.x}%`, top: `${fruitPos.y}%`, transform: 'translate(-50%, -50%)' }}>
+            style={{ left: `${wormPos.x}%`, top: `${wormPos.y}%`, transform: 'translate(-50%, -50%)' }}>
             <div className="relative w-full h-full animate-pulse-glow rounded-full">
-              <img src="/apple.png" alt="Apple" className="w-full h-full object-contain drop-shadow-2xl"
-                onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl">🍎</div>'; }} />
+              <img src="/worm.png" alt="Worm" className="w-full h-full object-contain drop-shadow-2xl"
+                onError={(e) => { 
+                  e.target.style.display = 'none'; 
+                  e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl">🐛</div>'; 
+                }} />
             </div>
           </div>
         )}
@@ -508,11 +545,8 @@ export default function MathAdventure() {
         <div className="flex flex-col gap-2 pointer-events-auto">
           <div className="glass-btn px-5 py-2.5 text-sm font-bold">🏆 สูงสุด: {highScore}</div>
           {playerName && <div className="glass-btn px-4 py-2 text-xs font-semibold">👤 {playerName}</div>}
-          {combo > 1 && gameState === 'PLAYING' && (
-            <div className="score-badge text-sm animate-pulse-glow">🔥 Combo x{combo}</div>
-          )}
+          {combo > 1 && gameState === 'PLAYING' && <div className="score-badge text-sm animate-pulse-glow">🔥 Combo x{combo}</div>}
         </div>
-
         {(gameState === 'PLAYING' || gameState === 'QUIZ') && (
           <div className="flex gap-3 pointer-events-auto">
             <div className="score-badge text-lg">⭐ {score}</div>
@@ -522,35 +556,20 @@ export default function MathAdventure() {
       </div>
 
       {/* 4. MODALS & OVERLAYS */}
-
-      {/* START SCREEN */}
       {gameState === 'START' && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-md z-50 p-4">
           <div className="glass-effect p-8 md:p-10 rounded-3xl shadow-2xl max-w-md w-full text-center border-4 border-white/30 animate-pop">
             <div className="text-6xl md:text-7xl mb-4 animate-bounce">🎮</div>
-
-            <h1 className="text-3xl md:text-4xl font-black mb-6 leading-snug 
-                     bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-400 
-                     bg-clip-text text-transparent 
-                     drop-shadow-[0_0_8px_rgba(244,114,182,0.6)]">
+            <h1 className="text-3xl md:text-4xl font-black mb-6 leading-snug bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(244,114,182,0.6)]">
               เกมคณิตศาสตร์ บวกลบ จำนวนเต็ม
             </h1>
-
             <input type="text" placeholder="ใส่ชื่อฮีโร่..." value={playerName}
               className="w-full glass-effect p-4 rounded-2xl text-center text-xl font-bold mb-6 outline-none focus:border-yellow-400 transition-all text-white placeholder-white/50"
               onChange={e => setPlayerName(e.target.value)} onKeyPress={e => e.key === 'Enter' && startGame()} maxLength={15} autoFocus />
-
-
             <div className="flex flex-col gap-3">
-              <button onClick={startGame} disabled={!playerName.trim()}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white py-4 rounded-2xl font-bold text-xl shadow-2xl disabled:opacity-50 transition-all hover:scale-105 active:scale-95">
-                เริ่มเกมเลย! 🚀
-              </button>
-              <button onClick={() => setGameState('LEADERBOARD')} className="glass-btn w-full py-3 font-bold text-lg text-white/80 hover:text-white hover:bg-white/20">
-                📊 ดูอันดับคะแนน
-              </button>
+              <button onClick={startGame} disabled={!playerName.trim()} className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white py-4 rounded-2xl font-bold text-xl shadow-2xl disabled:opacity-50 transition-all hover:scale-105 active:scale-95">เริ่มเกมเลย! 🚀</button>
+              <button onClick={() => setGameState('LEADERBOARD')} className="glass-btn w-full py-3 font-bold text-lg text-white/80 hover:text-white hover:bg-white/20">📊 ดูอันดับคะแนน</button>
             </div>
-
           </div>
         </div>
       )}
@@ -626,12 +645,8 @@ export default function MathAdventure() {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3"><div className="text-5xl">📊</div><h2 className="text-3xl md:text-4xl font-black text-white">Leaderboard</h2></div>
               <div className="flex gap-2">
-                <button onClick={loadLeaderboard} disabled={loadingLeaderboard} className="glass-btn px-4 py-2 text-sm font-bold hover:bg-white/30 disabled:opacity-50 cursor-pointer">
-                  {loadingLeaderboard ? '⏳' : '🔄'} Refresh
-                </button>
-                <button onClick={() => setGameState('START')} className="glass-btn px-4 py-2 text-sm font-bold hover:bg-white/30 cursor-pointer">
-                  ✕ ปิด
-                </button>
+                <button onClick={loadLeaderboard} disabled={loadingLeaderboard} className="glass-btn px-4 py-2 text-sm font-bold hover:bg-white/30 disabled:opacity-50 cursor-pointer">{loadingLeaderboard ? '⏳' : '🔄'} Refresh</button>
+                <button onClick={() => setGameState('START')} className="glass-btn px-4 py-2 text-sm font-bold hover:bg-white/30 cursor-pointer">✕ ปิด</button>
               </div>
             </div>
 
@@ -662,10 +677,7 @@ export default function MathAdventure() {
 
       {/* PARTICLE EFFECTS */}
       {particles.map(p => (
-        <div key={p.id} className="absolute text-2xl pointer-events-none z-[60] animate-bounce"
-          style={{ left: `${p.x}%`, top: `${p.y}%`, animation: 'confetti 2s ease-out forwards' }}>
-          {p.emoji}
-        </div>
+        <div key={p.id} className="absolute text-2xl pointer-events-none z-[60] animate-bounce" style={{ left: `${p.x}%`, top: `${p.y}%`, animation: 'confetti 2s ease-out forwards' }}>{p.emoji}</div>
       ))}
 
       {/* MOBILE CONTROLS */}
