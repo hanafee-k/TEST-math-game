@@ -37,8 +37,9 @@ const RATIONAL_QUESTIONS = [
 export default function MathAdventure() {
   // === STATE MANAGEMENT ===
   const [isClient, setIsClient] = useState(false);
-  const [gameState, setGameState] = useState('START'); 
+  const [gameState, setGameState] = useState('START');
   const [playerName, setPlayerName] = useState('');
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Game Stats
   const [score, setScore] = useState(0);
@@ -75,6 +76,14 @@ export default function MathAdventure() {
   // Refs
   const moveIntervalRef = useRef(null);
   const soundEnabledRef = useRef(true);
+
+  const toggleSound = () => {
+    setSoundEnabled(prev => {
+      const newState = !prev;
+      soundEnabledRef.current = newState; // อัปเดตให้ระบบเสียงรู้
+      return newState;
+    });
+  };
 
   // === INITIALIZATION ===
   useEffect(() => {
@@ -180,18 +189,20 @@ export default function MathAdventure() {
       case 2: x = Math.random() * 100; y = 110; break;
       case 3: x = -10; y = Math.random() * 100; break;
     }
-    const calculatedSpeed = Math.min(0.5 + (score * 0.03), 2.0);
-    setEnemies(prev => [...prev, { id: Date.now() + Math.random(), 
-      x, 
-      y, 
+    const calculatedSpeed = Math.min(0.7 + (score * 0.03), 2.0);
+    setEnemies(prev => [...prev, {
+      id: Date.now() + Math.random(),
+      x,
+      y,
       speed: calculatedSpeed,
-      direction: x < 50 ? 'right' : 'left'}]);
+      direction: x < 50 ? 'right' : 'left'
+    }]);
   }, [gameState, score]);
 
-// === OBSTACLE SYSTEM (STATIC BLOCKS 🧱) ===
+  // === OBSTACLE SYSTEM (STATIC BLOCKS 🧱) ===
   const randomizeObstacles = useCallback((safeX = 50, safeY = 50) => {
     // 1. สุ่มจำนวนให้ออกแค่ 3 หรือ 4 อัน (เยอะสุด 4)
-    const count = Math.floor(Math.random() * 2) + 3; 
+    const count = Math.floor(Math.random() * 2) + 3;
     const newObstacles = [];
 
     for (let i = 0; i < count; i++) {
@@ -203,7 +214,7 @@ export default function MathAdventure() {
         ox = Math.floor(Math.random() * 80) + 10;
         oy = Math.floor(Math.random() * 80) + 10;
         isSafe = true;
-        
+
         // กฎข้อที่ 1: ห้ามเกิดทับผู้เล่น (เว้นระยะห่าง 20)
         const distToPlayer = Math.sqrt(Math.pow(ox - safeX, 2) + Math.pow(oy - safeY, 2));
         if (distToPlayer < 20) {
@@ -244,12 +255,12 @@ export default function MathAdventure() {
     setShowResult(false);
 
     const level = Math.floor(score / 3);
-    const timeLimit = Math.max(8, 20 - level); 
+    const timeLimit = Math.max(8, 20 - level);
     setTimeLeft(timeLimit);
 
     const randomIndex = Math.floor(Math.random() * RATIONAL_QUESTIONS.length);
     const selectedItem = RATIONAL_QUESTIONS[randomIndex];
-    
+
     const shuffledChoices = [...selectedItem.choices].sort(() => Math.random() - 0.5);
 
     setQuestion({
@@ -288,7 +299,7 @@ export default function MathAdventure() {
         }
       }
 
-      if (hitObstacle) return prev; 
+      if (hitObstacle) return prev;
 
       // 2. 🐛 เช็คเก็บหนอน (เพื่อไปตอบคำถาม)
       const dx = newX - wormPos.x;
@@ -360,7 +371,7 @@ export default function MathAdventure() {
 
       setTimeout(() => {
         randomizeWorm();
-        randomizeObstacles(charPos.x, charPos.y); 
+        randomizeObstacles(charPos.x, charPos.y);
         setGameState('PLAYING');
         spawnEnemy(true);
       }, 1000);
@@ -379,7 +390,7 @@ export default function MathAdventure() {
       } else {
         setTimeout(() => {
           randomizeWorm();
-          randomizeObstacles(charPos.x, charPos.y); 
+          randomizeObstacles(charPos.x, charPos.y);
           setGameState('PLAYING');
         }, 1500);
       }
@@ -396,7 +407,7 @@ export default function MathAdventure() {
     setEnemies([]);
     setCharPos({ x: 50, y: 50 });
     randomizeWorm();
-    randomizeObstacles(50, 50); 
+    randomizeObstacles(50, 50);
     setGameState('PLAYING');
     playSound('collect');
   }, [playerName, randomizeWorm, playSound, randomizeObstacles]);
@@ -408,7 +419,7 @@ export default function MathAdventure() {
     setEnemies([]);
     setCharPos({ x: 50, y: 50 });
     randomizeWorm();
-    randomizeObstacles(50, 50); 
+    randomizeObstacles(50, 50);
     setGameState('PLAYING');
   }, [randomizeWorm, randomizeObstacles]);
 
@@ -434,7 +445,7 @@ export default function MathAdventure() {
           setShake(true);
           setTimeout(() => setShake(false), 500);
           setHearts(h => { const newH = h - 1; if (newH <= 0) setTimeout(() => endGame(), 500); return newH; });
-          
+
           // 👇 เพิ่มระบบวาร์ป: เมื่อนกโดนกัด เหยี่ยวตัวนั้นจะถูกจับโยนไปเกิดใหม่ขอบจอไกลๆ ทันที
           const edge = Math.floor(Math.random() * 4);
           let respawnX, respawnY;
@@ -447,7 +458,7 @@ export default function MathAdventure() {
           // คืนค่าเหยี่ยวตัวเดิม แต่จับเปลี่ยนพิกัด X, Y
           return { ...enemy, x: respawnX, y: respawnY, direction: currentDirection };
         }
-        
+
         return { ...enemy, x: newX, y: newY, direction: currentDirection };
       }).filter(Boolean));
 
@@ -468,7 +479,7 @@ export default function MathAdventure() {
   return (
     <div className={`h-screen w-full relative overflow-hidden select-none ${shake ? 'animate-shake' : ''}`}>
 
-    {/* 1. BACKGROUND */}
+      {/* 1. BACKGROUND */}
       <div className="absolute inset-0 z-0">
         <img src="/bg.png" alt="Background" className="w-full h-full object-cover"
           onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.className = 'absolute inset-0 bg-slate-800'; }} />
@@ -497,9 +508,9 @@ export default function MathAdventure() {
             style={{ left: `${enemy.x}%`, top: `${enemy.y}%`, transform: `translate(-50%, -50%) scaleX(${enemy.direction === 'left' ? '1' : '-1'})` }}>
             <div className="relative w-full h-full animate-bounce">
               <img src="/enemy.png" alt="Enemy" className="w-full h-full object-contain drop-shadow-lg"
-                onError={(e) => { 
-                  e.target.style.display = 'none'; 
-                  e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl drop-shadow-2xl flex items-center justify-center">🦅</div>'; 
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl drop-shadow-2xl flex items-center justify-center">🦅</div>';
                 }} />
             </div>
           </div>
@@ -511,9 +522,9 @@ export default function MathAdventure() {
             style={{ left: `${obs.x}%`, top: `${obs.y}%`, transform: `translate(-50%, -50%)` }}>
             <div className="relative w-full h-full">
               <img src="/block.png" alt="Block" className="w-full h-full object-contain drop-shadow-xl"
-                onError={(e) => { 
-                  e.target.style.display = 'none'; 
-                  e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl drop-shadow-2xl flex items-center justify-center">🧱</div>'; 
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl drop-shadow-2xl flex items-center justify-center">🧱</div>';
                 }} />
             </div>
           </div>
@@ -525,9 +536,9 @@ export default function MathAdventure() {
             style={{ left: `${wormPos.x}%`, top: `${wormPos.y}%`, transform: 'translate(-50%, -50%)' }}>
             <div className="relative w-full h-full animate-pulse-glow rounded-full">
               <img src="/worm.png" alt="Worm" className="w-full h-full object-contain drop-shadow-2xl"
-                onError={(e) => { 
-                  e.target.style.display = 'none'; 
-                  e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl">🐛</div>'; 
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = '<div class="text-5xl md:text-6xl">🐛</div>';
                 }} />
             </div>
           </div>
@@ -541,12 +552,24 @@ export default function MathAdventure() {
           {playerName && <div className="glass-btn px-4 py-2 text-xs font-semibold">👤 {playerName}</div>}
           {combo > 1 && gameState === 'PLAYING' && <div className="score-badge text-sm animate-pulse-glow">🔥 Combo x{combo}</div>}
         </div>
-        {(gameState === 'PLAYING' || gameState === 'QUIZ') && (
-          <div className="flex gap-3 pointer-events-auto">
-            <div className="score-badge text-lg">⭐ {score}</div>
-            <div className="heart-badge text-lg">{'❤️'.repeat(Math.max(0, hearts))}</div>
-          </div>
-        )}
+        <div className="flex gap-3 pointer-events-auto items-center">
+
+          {/* 👇 ปุ่มเปิด-ปิดเสียง 👇 */}
+          <button
+            onClick={toggleSound}
+            className="glass-btn px-3 py-1.5 text-xl hover:scale-110 transition-transform cursor-pointer"
+            title={soundEnabled ? 'ปิดเสียง' : 'เปิดเสียง'}
+          >
+            {soundEnabled ? '🔊' : '🔇'}
+          </button>
+
+          {(gameState === 'PLAYING' || gameState === 'QUIZ') && (
+            <>
+              <div className="score-badge text-lg">⭐ {score}</div>
+              <div className="heart-badge text-lg">{'❤️'.repeat(Math.max(0, hearts))}</div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* 4. MODALS & OVERLAYS */}
@@ -575,7 +598,7 @@ export default function MathAdventure() {
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 relative">
               <div className="absolute top-4 right-4 bg-red-500/90 backdrop-blur px-4 py-2 rounded-full font-bold text-xl animate-pulse border-2 border-white/30">⏰ {timeLeft}s</div>
               <div className="text-center">
-                <h2 className="text-5xl md:text-6xl font-black text-white drop-shadow-lg mb-2">{question.text}</h2>
+                <h2 className="text-3xl md:text-4xl font-black text-white drop-shadow-lg mb-2">{question.text}</h2>
                 {combo > 0 && <div className="text-yellow-300 font-bold text-sm animate-bounce">🔥 Combo x{combo}</div>}
               </div>
             </div>
