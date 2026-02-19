@@ -181,22 +181,30 @@ export default function MathAdventure() {
   // === ENEMY SYSTEM 🦅 ===
   const spawnEnemy = useCallback((force = false) => {
     if (!force && gameState !== 'PLAYING') return;
-    const edge = Math.floor(Math.random() * 4);
-    let x, y;
-    switch (edge) {
-      case 0: x = Math.random() * 100; y = -10; break;
-      case 1: x = 110; y = Math.random() * 100; break;
-      case 2: x = Math.random() * 100; y = 110; break;
-      case 3: x = -10; y = Math.random() * 100; break;
-    }
-    const calculatedSpeed = Math.min(0.7 + (score * 0.03), 2.0);
-    setEnemies(prev => [...prev, {
-      id: Date.now() + Math.random(),
-      x,
-      y,
-      speed: calculatedSpeed,
-      direction: x < 50 ? 'right' : 'left'
-    }]);
+
+    setEnemies(prev => {
+      // 🛑 จำกัดอินทรี: ถ้ามี 2 ตัวแล้ว ไม่ต้องเกิดเพิ่ม
+      if (prev.length >= 2) return prev;
+
+      const edge = Math.floor(Math.random() * 4);
+      let x, y;
+      switch (edge) {
+        case 0: x = Math.random() * 100; y = -10; break;
+        case 1: x = 110; y = Math.random() * 100; break;
+        case 2: x = Math.random() * 100; y = 110; break;
+        case 3: x = -10; y = Math.random() * 100; break;
+      }
+
+      const calculatedSpeed = Math.min(0.3 + (score * 0.01), 1.1);
+
+      return [...prev, {
+        id: Date.now() + Math.random(),
+        x,
+        y,
+        speed: calculatedSpeed,
+        direction: x < 50 ? 'right' : 'left'
+      }];
+    });
   }, [gameState, score]);
 
   // === OBSTACLE SYSTEM (STATIC BLOCKS 🧱) ===
@@ -306,9 +314,13 @@ export default function MathAdventure() {
       const dy = newY - wormPos.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance < 5) {
+      if (distance < 10) {
         playSound('collect');
         createParticles(wormPos.x, wormPos.y, 'star');
+
+        // 👉 ล้างอินทรีออกจากฉากทันทีที่กินหนอนได้
+        setEnemies([]);
+
         generateQuestion();
         return prev;
       }
@@ -369,11 +381,14 @@ export default function MathAdventure() {
       createParticles(50, 50, 'star');
       setEnemies([]);
 
+      // (หาท่อนนี้ใน handleAnswer แล้วแก้ตรง setTimeout)
       setTimeout(() => {
         randomizeWorm();
         randomizeObstacles(charPos.x, charPos.y);
         setGameState('PLAYING');
+        // 👉 สุ่มเกิดอินทรีใหม่ 2 ตัว (ห่างกันนิดนึงจะได้ไม่ซ้อนกัน)
         spawnEnemy(true);
+        setTimeout(() => spawnEnemy(true), 800);
       }, 1000);
 
     } else {
@@ -476,12 +491,16 @@ export default function MathAdventure() {
 
   if (!isClient) return null;
 
+  // 🌍 คำนวณระบบด่าน (Level System)
+  const currentStage = score >= 15 ? 4 : score >= 10 ? 3 : score >= 5 ? 2 : 1;
+  const bgImage = currentStage === 4 ? '/bg4.png' : currentStage === 3 ? '/bg3.png' : currentStage === 2 ? '/bg2.png' : '/bg.png';
+
   return (
     <div className={`h-screen w-full relative overflow-hidden select-none ${shake ? 'animate-shake' : ''}`}>
 
       {/* 1. BACKGROUND */}
-      <div className="absolute inset-0 z-0">
-        <img src="/bg.png" alt="Background" className="w-full h-full object-cover"
+      <div className="absolute inset-0 z-0 transition-all duration-1000">
+        <img src={bgImage} alt="Background" className="w-full h-full object-cover"
           onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.className = 'absolute inset-0 bg-slate-800'; }} />
       </div>
 
@@ -548,7 +567,14 @@ export default function MathAdventure() {
       {/* 3. TOP HUD */}
       <div className="absolute top-0 w-full p-4 flex justify-between items-start z-30 pointer-events-none">
         <div className="flex flex-col gap-2 pointer-events-auto">
-          <div className="glass-btn px-5 py-2.5 text-sm font-bold">🏆 สูงสุด: {highScore}</div>
+          {/* 👉 เพิ่มป้ายบอกด่านตรงนี้ */}
+          {(gameState === 'PLAYING' || gameState === 'QUIZ') && (
+            <div className="glass-btn px-4 py-2 text-sm font-bold bg-gradient-to-r from-blue-500/80 to-purple-500/80 text-white">
+              🌍 ด่านที่ {currentStage}
+            </div>
+          )}
+
+          <div className="glass-btn px-5 py-2.5 text-sm font-bold mt-1">🏆 สูงสุด: {highScore}</div>
           {playerName && <div className="glass-btn px-4 py-2 text-xs font-semibold">👤 {playerName}</div>}
           {combo > 1 && gameState === 'PLAYING' && <div className="score-badge text-sm animate-pulse-glow">🔥 Combo x{combo}</div>}
         </div>
